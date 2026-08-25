@@ -2178,7 +2178,6 @@ export const make = Effect.gen(function* () {
     const cacheKey = prLookupCacheKey(cacheCwd, {
       branch,
       upstreamRef,
-      defaultBranch,
       localBranchExists,
       ...(localBranchExists ? {} : { remoteName }),
     });
