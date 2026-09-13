@@ -1064,13 +1064,8 @@ export const make = Effect.gen(function* () {
   };
   const prLookupCache = yield* Cache.makeWith(
     (key: string) => {
-      const [
-        cwd = "",
-        branch = "",
-        upstreamRef = "",
-        branchExists = "1",
-        remoteName = "",
-      ] = key.split("\u0000");
+      const [cwd = "", branch = "", upstreamRef = "", branchExists = "1", remoteName = ""] =
+        key.split("\u0000");
       const details = {
         branch,
         upstreamRef: upstreamRef.length > 0 ? upstreamRef : null,
