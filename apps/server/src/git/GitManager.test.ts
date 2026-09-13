@@ -3441,6 +3441,69 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
     }),
   );
 
+  it.effect.each(["main", "dev"])(
+    "push completion links the branch's own PR after a plain push while tracking origin/%s",
+    (baseBranch) =>
+      Effect.gen(function* () {
+        const repoDir = yield* makeTempDir("t3code-git-manager-");
+        yield* initRepo(repoDir);
+        const remoteDir = yield* createBareRemote();
+        yield* runGit(repoDir, ["remote", "add", "origin", remoteDir]);
+        yield* runGit(repoDir, ["push", "-u", "origin", "main"]);
+        yield* runGit(repoDir, ["remote", "set-head", "origin", "main"]);
+        if (baseBranch !== "main") {
+          yield* runGit(repoDir, ["branch", baseBranch]);
+          yield* runGit(repoDir, ["push", "origin", baseBranch]);
+        }
+        const branch = "feature/push-toast";
+        yield* runGit(repoDir, ["checkout", "-b", branch, `origin/${baseBranch}`]);
+        NodeFS.writeFileSync(NodePath.join(repoDir, "feature.txt"), "feature\n");
+        yield* runGit(repoDir, ["add", "feature.txt"]);
+        yield* runGit(repoDir, ["commit", "-m", "Add feature"]);
+        yield* runGit(repoDir, ["push", "origin", branch]);
+        expect(
+          (yield* runGit(repoDir, ["rev-parse", "--abbrev-ref", "@{upstream}"])).stdout.trim(),
+        ).toBe(`origin/${baseBranch}`);
+
+        const prUrl = "https://github.com/pingdotgg/codething-mvp/pull/88";
+        const { manager, ghCalls } = yield* makeManager({
+          ghScenario: {
+            prListByHeadSelector: {
+              [baseBranch]: encodeCliJson([
+                {
+                  number: 99,
+                  title: "Base branch PR",
+                  url: "https://github.com/pingdotgg/codething-mvp/pull/99",
+                  baseRefName: "release",
+                  headRefName: baseBranch,
+                  state: "OPEN",
+                },
+              ]),
+              [branch]: encodeCliJson([
+                {
+                  number: 88,
+                  title: "Feature PR",
+                  url: prUrl,
+                  baseRefName: baseBranch,
+                  headRefName: branch,
+                  state: "OPEN",
+                },
+              ]),
+            },
+          },
+        });
+
+        const result = yield* runStackedAction(manager, { cwd: repoDir, action: "push" });
+
+        expect(result.push.status).toBe("pushed");
+        expect(
+          (yield* runGit(repoDir, ["rev-parse", "--abbrev-ref", "@{upstream}"])).stdout.trim(),
+        ).toBe(`origin/${branch}`);
+        expect(result.toast.cta).toEqual({ kind: "open_pr", label: "View PR", url: prUrl });
+        expect(ghCalls.some((call) => call.includes(`--head ${baseBranch}`))).toBe(false);
+      }),
+  );
+
   it.effect("pushes existing commits without committing dirty worktree changes", () =>
     Effect.gen(function* () {
       const repoDir = yield* makeTempDir("t3code-git-manager-");
