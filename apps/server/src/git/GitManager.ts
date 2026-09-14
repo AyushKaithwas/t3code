@@ -1682,11 +1682,13 @@ export const make = Effect.gen(function* () {
       finalBranchContext?.hasUpstream === true;
 
     if (shouldLookupExistingOpenPr && finalBranchContext) {
-      latestOpenPr = yield* resolveBranchHeadContext(cwd, {
+      latestOpenPr = yield* resolveLookupHeadContext(cwd, {
         branch: finalBranchContext.branch,
         upstreamRef: finalBranchContext.upstreamRef,
       }).pipe(
-        Effect.flatMap((headContext) => findOpenPr(cwd, headContext)),
+        Effect.flatMap(({ headContext, lookup }) =>
+          lookup ? findOpenPr(cwd, headContext) : Effect.succeed(null),
+        ),
         Effect.orElseSucceed(() => null),
       );
     }
