@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   applyGitStatusStreamEvent,
+  resolveDefaultWorktreeBaseRef,
   buildTemporaryWorktreeBranchName,
   isTemporaryWorktreeBranch,
   normalizeGitRemoteUrl,
@@ -272,5 +273,34 @@ describe("applyGitStatusStreamEvent", () => {
       behindCount: 1,
       pr: null,
     });
+  });
+});
+
+describe("resolveDefaultWorktreeBaseRef", () => {
+  const refs = [{ name: "origin/main", isDefault: true }];
+
+  it.each(["dev", "upstream/dev", "refs/tags/v1", "a1b2c3d", "missing-branch"])(
+    "honors %s even when it is absent from the loaded page of refs",
+    (configuredRef) => {
+      expect(
+        resolveDefaultWorktreeBaseRef({ configuredRef, refs, currentBranch: "feature/current" }),
+      ).toBe(configuredRef);
+    },
+  );
+
+  it("uses the repository default before the checkout and handles repositories with no refs", () => {
+    expect(
+      resolveDefaultWorktreeBaseRef({
+        configuredRef: null,
+        refs,
+        currentBranch: "feature/current",
+      }),
+    ).toBe("origin/main");
+    expect(
+      resolveDefaultWorktreeBaseRef({ configuredRef: null, refs: [], currentBranch: "dev" }),
+    ).toBe("dev");
+    expect(
+      resolveDefaultWorktreeBaseRef({ configuredRef: null, refs: [], currentBranch: null }),
+    ).toBeNull();
   });
 });

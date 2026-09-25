@@ -2,7 +2,7 @@ import { useNavigation } from "@react-navigation/native";
 import { SettingsRow } from "./components/SettingsRow";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { SymbolView } from "../../components/AppSymbol";
-import { AppText as Text } from "../../components/AppText";
+import { AppText as Text, AppTextInput } from "../../components/AppText";
 import {
   type ResponseStreamingMode,
   type ServerSettings,
@@ -46,7 +46,12 @@ const PAGE_TITLES: Record<SettingsPage, string> = {
 };
 
 const PAGE_PROJECT_KEYS: Record<SettingsPage, readonly ProjectScopedServerSettingKey[]> = {
-  "new-threads": ["defaultThreadEnvMode", "worktreeSubmodules", "defaultRuntimeMode"],
+  "new-threads": [
+    "defaultThreadEnvMode",
+    "defaultWorktreeBaseRef",
+    "worktreeSubmodules",
+    "defaultRuntimeMode",
+  ],
   "source-control": ["defaultAutoPull", "newWorktreesStartFromOrigin"],
   "agent-behavior": ["responseStreamingMode", "enableAgentBrowserAccess"],
   maintenance: ["continueThreadsAfterServerUpdate"],
@@ -274,6 +279,26 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                         onPress={() => write({ defaultThreadEnvMode: choice.mode })}
                       />
                     ))}
+                  </SettingsSection>
+                  <SettingsSection title="Worktree base ref">
+                    <View className="gap-3 p-4">
+                      <Text className="text-sm text-foreground-muted">
+                        Branch, tag, or commit to start new worktrees from. Leave blank to use the
+                        repository default.
+                      </Text>
+                      <WorktreeBaseRefField
+                        key={JSON.stringify(
+                          targets.map((target) => [
+                            target.environment.environmentId,
+                            target.projectId,
+                          ]),
+                        )}
+                        value={uniform("defaultWorktreeBaseRef")}
+                        mixed={isMixed("defaultWorktreeBaseRef")}
+                        disabled={disabledFor("defaultWorktreeBaseRef")}
+                        onCommit={(value) => write({ defaultWorktreeBaseRef: value })}
+                      />
+                    </View>
                   </SettingsSection>
                   <SettingsSection
                     title="Worktree submodules"
@@ -560,5 +585,33 @@ function FanoutSwitchRow(props: {
         <Text className="text-sm font-t3-medium text-foreground">Mixed · Set on</Text>
       </Pressable>
     </SettingsControlRow>
+  );
+}
+
+function WorktreeBaseRefField(props: {
+  readonly value: string | null;
+  readonly mixed: boolean;
+  readonly disabled: boolean;
+  readonly onCommit: (value: string | null) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <AppTextInput
+      accessibilityLabel="Worktree base ref"
+      className="min-h-11 rounded-xl border-continuous bg-card px-3 text-base text-foreground"
+      value={draft ?? props.value ?? ""}
+      placeholder={props.mixed ? "Mixed" : "Repository default"}
+      autoCapitalize="none"
+      autoCorrect={false}
+      returnKeyType="done"
+      editable={!props.disabled}
+      onChangeText={setDraft}
+      onEndEditing={(event) => {
+        const value = event.nativeEvent.text.trim() || null;
+        setDraft(null);
+        if (draft !== null && !props.disabled && (props.mixed || value !== props.value))
+          props.onCommit(value);
+      }}
+    />
   );
 }

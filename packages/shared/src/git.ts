@@ -10,6 +10,17 @@ import * as Arr from "effect/Array";
 import * as Result from "effect/Result";
 import { detectSourceControlProviderFromRemoteUrl } from "./sourceControl.ts";
 
+/** Keep configured refs verbatim: tags, commits and paginated-out branches need not be listed. */
+export function resolveDefaultWorktreeBaseRef(input: {
+  readonly configuredRef: string | null;
+  readonly refs: readonly Pick<VcsRef, "name" | "isDefault">[];
+  readonly currentBranch: string | null;
+}): string | null {
+  return (
+    input.configuredRef ?? input.refs.find((ref) => ref.isDefault)?.name ?? input.currentBranch
+  );
+}
+
 export const WORKTREE_BRANCH_PREFIX = "t3code";
 // Canonical form is `t3code/<8 hex>`. Older mobile builds generated `t3code/<uuid>`
 // via Crypto.randomUUID() (always RFC 4122 v4), so the matcher also accepts exactly

@@ -24,6 +24,7 @@ import { PULL_REQUEST_MERGE_METHOD_LABELS } from "../pullRequest/pullRequestDeta
 import { TraitsPicker } from "../chat/TraitsPicker";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
+import { DraftInput } from "../ui/draft-input";
 import { Switch } from "../ui/switch";
 import type { ProjectSettingsCategory } from "./ProjectSettingsPanel";
 import { searchableSetting } from "./settingsSearch";
@@ -76,6 +77,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   const mixedPermissions = useScopedSettingsMixed(["defaultRuntimeMode"]);
   const PermissionIcon = runtimeModeConfig[settings.defaultRuntimeMode].icon;
   const mixedWorkspace = useScopedSettingsMixed(["defaultThreadEnvMode"]);
+  const mixedBaseRef = useScopedSettingsMixed(["defaultWorktreeBaseRef"]);
   const mixedSubmodules = useScopedSettingsMixed(["worktreeSubmodules"]);
   const mixedBrowser = useScopedSettingsMixed(["enableAgentBrowserAccess"]);
   const mixedAutoPull = useScopedSettingsMixed(["defaultAutoPull"]);
@@ -199,6 +201,36 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       }
     />
   );
+  const baseRefRow = (
+    <SettingsRow
+      serverScoped
+      settingKeys={["defaultWorktreeBaseRef"]}
+      mixed={mixedBaseRef}
+      {...searchableSetting("worktree-base-ref")}
+      description="Branch, tag, or commit to start new worktrees from. Leave blank to use the repository default."
+      resetAction={
+        !isProjectScope && settings.defaultWorktreeBaseRef !== null ? (
+          <SettingResetButton
+            label="worktree base ref"
+            onClick={() => updateSettings({ defaultWorktreeBaseRef: null })}
+          />
+        ) : null
+      }
+      control={
+        <div className="w-56 max-w-full">
+          <DraftInput
+            key={JSON.stringify(
+              targets.map(({ environmentId, projectId }) => [environmentId, projectId]),
+            )}
+            aria-label="Worktree base ref"
+            value={mixedBaseRef ? "" : (settings.defaultWorktreeBaseRef ?? "")}
+            placeholder={mixedBaseRef ? "Mixed" : "Repository default"}
+            onCommit={(value) => updateSettings({ defaultWorktreeBaseRef: value.trim() || null })}
+          />
+        </div>
+      }
+    />
+  );
   const workspaceRow = (
     <SettingsRow
       serverScoped
@@ -268,6 +300,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
         <>
           {modelRow}
           {workspaceRow}
+          {baseRefRow}
         </>
       ) : category === "general" ? (
         <>
@@ -334,6 +367,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             }
           />
           {workspaceRow}
+          {baseRefRow}
           <SettingsRow
             serverScoped
             settingKeys={["worktreeSubmodules"]}

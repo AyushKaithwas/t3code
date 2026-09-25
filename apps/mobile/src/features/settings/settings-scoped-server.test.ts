@@ -102,6 +102,27 @@ describe("mobile project settings scope", () => {
     ]);
   });
 
+  it("keeps an explicit repository default separate from inheriting the environment base", () => {
+    const settings = {
+      ...DEFAULT_SERVER_SETTINGS,
+      defaultWorktreeBaseRef: "origin/dev",
+      projectSettingsOverrides: { [firstProject]: { defaultWorktreeBaseRef: "release" } },
+    };
+    const targets = resolveMobileSettingsTargets(
+      [environment(firstId, settings)],
+      [{ environmentId: firstId, id: firstProject }],
+    );
+    expect(planMobileScopedSettingsPatch(targets, true, { defaultWorktreeBaseRef: null })).toEqual([
+      {
+        environmentId: firstId,
+        patch: { projectSettingsOverrides: { [firstProject]: { defaultWorktreeBaseRef: null } } },
+      },
+    ]);
+    expect(planMobileScopedSettingsClear(targets, ["defaultWorktreeBaseRef"])).toEqual([
+      { environmentId: firstId, patch: { projectSettingsOverrides: { [firstProject]: null } } },
+    ]);
+  });
+
   it("resets only the selected page's override and rejects environment-wide writes", () => {
     const settings: ServerSettings = {
       ...DEFAULT_SERVER_SETTINGS,

@@ -1,3 +1,6 @@
+import { resolveDefaultWorktreeBaseRef } from "@t3tools/shared/git";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { useEnvironmentSettings } from "../hooks/useSettings";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
 import { useRightPanelStore } from "../rightPanelStore";
@@ -150,6 +153,11 @@ export function BranchToolbarBranchSelector({
       ? scopeProjectRef(draftThread.environmentId, draftThread.projectId)
       : null;
   const activeProject = useProject(activeProjectRef);
+  const configuredBaseRef = useEnvironmentSettings(
+    environmentId,
+    (settings) =>
+      resolveProjectSettings(settings, activeProject?.id ?? null).settings.defaultWorktreeBaseRef,
+  );
 
   const activeThreadId = serverThread?.id ?? (draftThread ? threadId : undefined);
   const activeThreadBranch =
@@ -509,15 +517,13 @@ export function BranchToolbarBranchSelector({
     });
   };
 
-  // Default the worktree base to the repo default branch (origin/HEAD), only
-  // falling back to the checked-out branch when no default is known.
-  const defaultBranchName = useMemo(
-    () => refs.find((refName) => refName.isDefault)?.name ?? null,
-    [refs],
-  );
   const worktreeBaseBranchCandidate = isInitialBranchesLoadPending
     ? null
-    : (defaultBranchName ?? currentGitBranch);
+    : resolveDefaultWorktreeBaseRef({
+        configuredRef: configuredBaseRef,
+        refs,
+        currentBranch: currentGitBranch,
+      });
 
   useEffect(() => {
     if (

@@ -18,7 +18,7 @@ import {
   T3_PROJECT_FILE_NAME,
   ThreadId,
 } from "@t3tools/contracts";
-import { sanitizeNewRefName } from "@t3tools/shared/git";
+import { resolveDefaultWorktreeBaseRef, sanitizeNewRefName } from "@t3tools/shared/git";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
 import * as Arr from "effect/Array";
@@ -881,18 +881,27 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     }
     // The default may only exist as origin/<default> (isRemote), which
     // availableBranches filters out — search the unfiltered refs for it.
-    const preferredBranch =
-      allBranchRefs.find((branch) => branch.isDefault) ??
-      availableBranches.find((branch) => branch.current) ??
-      null;
+    const preferredBranch = resolveDefaultWorktreeBaseRef({
+      configuredRef: projectSettings.settings.defaultWorktreeBaseRef,
+      refs: allBranchRefs,
+      currentBranch: availableBranches.find((branch) => branch.current)?.name ?? null,
+    });
     if (preferredBranch) {
-      selectBranch(preferredBranch);
+      updateComposerDraftSettings(selectedProjectDraftKey, {
+        workspaceSelection: {
+          mode: "worktree",
+          branch: preferredBranch,
+          worktreePath: null,
+          ...(draftStartFromOrigin !== undefined ? { startFromOrigin: draftStartFromOrigin } : {}),
+        },
+      });
     }
   }, [
     allBranchRefs,
     availableBranches,
     defaultWorkspaceModeSettled,
-    selectBranch,
+    draftStartFromOrigin,
+    projectSettings.settings.defaultWorktreeBaseRef,
     selectedBranchName,
     selectedProjectDraftKey,
     workspaceMode,
