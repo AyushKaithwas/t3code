@@ -882,7 +882,9 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     // The default may only exist as origin/<default> (isRemote), which
     // availableBranches filters out — search the unfiltered refs for it.
     const preferredBranch = resolveDefaultWorktreeBaseRef({
-      configuredRef: projectSettings.settings.defaultWorktreeBaseRef,
+      configuredRef: selectedEnvironmentServerConfig
+        ? projectSettings.settings.defaultWorktreeBaseRef
+        : undefined,
       refs: allBranchRefs,
       currentBranch: availableBranches.find((branch) => branch.current)?.name ?? null,
     });
@@ -903,6 +905,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     draftStartFromOrigin,
     projectSettings.settings.defaultWorktreeBaseRef,
     selectedBranchName,
+    selectedEnvironmentServerConfig,
     selectedProjectDraftKey,
     workspaceMode,
   ]);

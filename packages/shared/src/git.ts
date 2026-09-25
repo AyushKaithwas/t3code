@@ -10,12 +10,16 @@ import * as Arr from "effect/Array";
 import * as Result from "effect/Result";
 import { detectSourceControlProviderFromRemoteUrl } from "./sourceControl.ts";
 
-/** Keep configured refs verbatim: tags, commits and paginated-out branches need not be listed. */
+/**
+ * Wait for settings (undefined); null opts into the repository default.
+ * Keep configured refs verbatim: tags, commits and paginated-out branches need not be listed.
+ */
 export function resolveDefaultWorktreeBaseRef(input: {
-  readonly configuredRef: string | null;
+  readonly configuredRef: string | null | undefined;
   readonly refs: readonly Pick<VcsRef, "name" | "isDefault">[];
   readonly currentBranch: string | null;
 }): string | null {
+  if (input.configuredRef === undefined) return null;
   return (
     input.configuredRef ?? input.refs.find((ref) => ref.isDefault)?.name ?? input.currentBranch
   );

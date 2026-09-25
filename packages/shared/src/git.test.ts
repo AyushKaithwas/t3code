@@ -279,6 +279,19 @@ describe("applyGitStatusStreamEvent", () => {
 describe("resolveDefaultWorktreeBaseRef", () => {
   const refs = [{ name: "origin/main", isDefault: true }];
 
+  it("waits for saved settings when refs load first", () => {
+    expect(
+      resolveDefaultWorktreeBaseRef({
+        configuredRef: undefined,
+        refs,
+        currentBranch: "main",
+      }),
+    ).toBeNull();
+    expect(
+      resolveDefaultWorktreeBaseRef({ configuredRef: "dev", refs, currentBranch: "main" }),
+    ).toBe("dev");
+  });
+
   it.each(["dev", "upstream/dev", "refs/tags/v1", "a1b2c3d", "missing-branch"])(
     "honors %s even when it is absent from the loaded page of refs",
     (configuredRef) => {

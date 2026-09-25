@@ -1,6 +1,6 @@
 import { resolveDefaultWorktreeBaseRef } from "@t3tools/shared/git";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { useEnvironmentSettings } from "../hooks/useSettings";
+import { useAtomValue } from "@effect/atom-react";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
 import { useRightPanelStore } from "../rightPanelStore";
@@ -37,6 +37,7 @@ import { shouldLoadNextBranchPageAfterScroll } from "../state/paginatedBranches"
 import { usePaginatedBranches } from "../state/queries";
 import { useProject, useThreadShell } from "../state/entities";
 import { useEnvironmentQuery } from "../state/query";
+import { serverEnvironment } from "../state/server";
 import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import { vcsEnvironment } from "../state/vcs";
@@ -153,11 +154,13 @@ export function BranchToolbarBranchSelector({
       ? scopeProjectRef(draftThread.environmentId, draftThread.projectId)
       : null;
   const activeProject = useProject(activeProjectRef);
-  const configuredBaseRef = useEnvironmentSettings(
-    environmentId,
-    (settings) =>
-      resolveProjectSettings(settings, activeProject?.id ?? null).settings.defaultWorktreeBaseRef,
-  );
+  const serverSettings = useAtomValue(serverEnvironment.settingsValueAtom(environmentId));
+  const configuredBaseRef = serverSettings
+    ? resolveProjectSettings(
+        serverSettings,
+        serverThread?.projectId ?? draftThread?.projectId ?? null,
+      ).settings.defaultWorktreeBaseRef
+    : undefined;
 
   const activeThreadId = serverThread?.id ?? (draftThread ? threadId : undefined);
   const activeThreadBranch =
