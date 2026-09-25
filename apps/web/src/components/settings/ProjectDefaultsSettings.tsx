@@ -24,11 +24,11 @@ import { PULL_REQUEST_MERGE_METHOD_LABELS } from "../pullRequest/pullRequestDeta
 import { TraitsPicker } from "../chat/TraitsPicker";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
-import { DraftInput } from "../ui/draft-input";
 import { Switch } from "../ui/switch";
 import type { ProjectSettingsCategory } from "./ProjectSettingsPanel";
 import { searchableSetting } from "./settingsSearch";
 import { useSettingsScope } from "./SettingsScopeContext";
+import { WorktreeBaseRefPicker } from "./WorktreeBaseRefPicker";
 import {
   SETTINGS_PICKER_TRIGGER_CLASSNAME,
   SettingResetButton,
@@ -207,7 +207,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["defaultWorktreeBaseRef"]}
       mixed={mixedBaseRef}
       {...searchableSetting("worktree-base-ref")}
-      description="Branch, tag, or commit to start new worktrees from. Leave blank to use the repository default."
+      description="Branch, tag, or commit to start new worktrees from."
       resetAction={
         !isProjectScope && settings.defaultWorktreeBaseRef !== null ? (
           <SettingResetButton
@@ -217,15 +217,14 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
         ) : null
       }
       control={
-        <div className="w-56 max-w-full">
-          <DraftInput
+        <div className="w-40 max-w-full">
+          <WorktreeBaseRefPicker
             key={JSON.stringify(
               targets.map(({ environmentId, projectId }) => [environmentId, projectId]),
             )}
-            aria-label="Worktree base ref"
-            value={mixedBaseRef ? "" : (settings.defaultWorktreeBaseRef ?? "")}
-            placeholder={mixedBaseRef ? "Mixed" : "Repository default"}
-            onCommit={(value) => updateSettings({ defaultWorktreeBaseRef: value.trim() || null })}
+            value={settings.defaultWorktreeBaseRef}
+            mixed={mixedBaseRef}
+            onChange={(value) => updateSettings({ defaultWorktreeBaseRef: value })}
           />
         </div>
       }
