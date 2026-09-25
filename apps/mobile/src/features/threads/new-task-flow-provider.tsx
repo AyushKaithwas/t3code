@@ -1,3 +1,6 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { AsyncResult } from "effect/unstable/reactivity";
+import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
@@ -147,6 +150,7 @@ type NewTaskFlowContextValue = {
   readonly selectedModelKey: string | null;
   readonly workspaceMode: WorkspaceMode;
   readonly selectedBranchName: string | null;
+  readonly lastWorktreeBaseBranch: string | null;
   readonly selectedWorktreePath: string | null;
   readonly startFromOrigin: boolean;
   readonly draftKey: string | null;
@@ -464,6 +468,21 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const workspaceMode = selectedProjectDraft.workspaceSelection?.mode ?? defaultWorkspaceMode;
   const selectedBranchName = selectedProjectDraft.workspaceSelection?.branch ?? null;
   const selectedWorktreePath = selectedProjectDraft.workspaceSelection?.worktreePath ?? null;
+  const preferencesResult = useAtomValue(mobilePreferencesAtom);
+  const preferencesLoaded = AsyncResult.isSuccess(preferencesResult);
+  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const lastWorktreeBaseBranch =
+    preferencesLoaded && selectedProject
+      ? (preferencesResult.value.lastWorktreeBaseBranchByProject?.[
+          scopedProjectKey(selectedProject.environmentId, selectedProject.id)
+        ] ?? null)
+      : null;
+  const configuredBaseRef = selectedEnvironmentServerConfig
+    ? projectSettings.settings.defaultWorktreeBaseRef
+    : undefined;
+  const rememberedBranch =
+    configuredBaseRef && typeof configuredBaseRef === "object" ? lastWorktreeBaseBranch : null;
+
   // Keep the user's explicit choice separate from the resolved display value:
   // only the explicit flag is ever written back to the draft, so the resolved
   // value keeps tracking the server setting when the config loads late.
@@ -650,6 +669,50 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const hasMoreBranches =
     branchState.data?.nextCursor !== null && branchState.data?.nextCursor !== undefined;
   const allBranchRefs = branchState.refs;
+  const needsWorktreeBase =
+    workspaceMode === "worktree" && selectedBranchName === null && selectedWorktreePath === null;
+  const baseBranchesQuery = useEnvironmentQuery(
+    needsWorktreeBase && selectedProject?.workspaceRoot
+      ? vcsEnvironment.listRefs({
+          environmentId: selectedProject.environmentId,
+          input: { cwd: selectedProject.workspaceRoot, limit: 100 },
+        })
+      : null,
+  );
+  const rememberedBranchState = usePaginatedBranches({
+    environmentId: selectedProject?.environmentId ?? null,
+    cwd: needsWorktreeBase && rememberedBranch ? selectedProject?.workspaceRoot || null : null,
+    query: rememberedBranch?.slice(0, 256) ?? null,
+    includeMatchingRemoteRefs: true,
+  });
+  const rememberedRef = rememberedBranchState.refs.find((ref) => ref.name === rememberedBranch);
+  const hasMoreRememberedRefs = rememberedBranchState.data?.nextCursor != null;
+  const loadMoreRememberedRefs = rememberedBranchState.loadNext;
+  useEffect(() => {
+    if (
+      needsWorktreeBase &&
+      rememberedBranch &&
+      !rememberedRef &&
+      hasMoreRememberedRefs &&
+      !rememberedBranchState.isPending &&
+      !rememberedBranchState.error
+    )
+      loadMoreRememberedRefs();
+  }, [
+    needsWorktreeBase,
+    rememberedBranch,
+    rememberedRef,
+    hasMoreRememberedRefs,
+    rememberedBranchState.isPending,
+    rememberedBranchState.error,
+    loadMoreRememberedRefs,
+  ]);
+  const rememberedBranchPending =
+    rememberedBranch !== null &&
+    !rememberedRef &&
+    !rememberedBranchState.error &&
+    (rememberedBranchState.data === null || hasMoreRememberedRefs);
+
   const availableBranches = useMemo(
     () =>
       pipe(
@@ -819,6 +882,16 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       if (!selectedProject || !selectedProjectDraftKey) {
         return;
       }
+      if (workspaceMode === "worktree") {
+        savePreferences({
+          transform: (current) => ({
+            lastWorktreeBaseBranchByProject: {
+              ...current.lastWorktreeBaseBranchByProject,
+              [scopedProjectKey(selectedProject.environmentId, selectedProject.id)]: branch.name,
+            },
+          }),
+        });
+      }
       pendingLocalBranchSyncDraftKeysRef.current.delete(selectedProjectDraftKey);
       updateComposerDraftSettings(selectedProjectDraftKey, {
         workspaceSelection: {
@@ -833,7 +906,13 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
         },
       });
     },
-    [draftStartFromOrigin, selectedProject, selectedProjectDraftKey, workspaceMode],
+    [
+      draftStartFromOrigin,
+      selectedProject,
+      selectedProjectDraftKey,
+      workspaceMode,
+      savePreferences,
+    ],
   );
 
   const setStartFromOrigin = useCallback(
@@ -867,6 +946,9 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     if (
       !selectedProjectDraftKey ||
       !defaultWorkspaceModeSettled ||
+      !preferencesLoaded ||
+      baseBranchesQuery.data === null ||
+      rememberedBranchPending ||
       workspaceMode !== "worktree" ||
       selectedBranchName !== null
     ) {
@@ -882,11 +964,10 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     // The default may only exist as origin/<default> (isRemote), which
     // availableBranches filters out — search the unfiltered refs for it.
     const preferredBranch = resolveDefaultWorktreeBaseRef({
-      configuredRef: selectedEnvironmentServerConfig
-        ? projectSettings.settings.defaultWorktreeBaseRef
-        : undefined,
-      refs: allBranchRefs,
-      currentBranch: availableBranches.find((branch) => branch.current)?.name ?? null,
+      configuredRef: configuredBaseRef,
+      rememberedRef: rememberedRef?.name ?? null,
+      refs: baseBranchesQuery.data.refs,
+      currentBranch: baseBranchesQuery.data.refs.find((branch) => branch.current)?.name ?? null,
     });
     if (preferredBranch) {
       updateComposerDraftSettings(selectedProjectDraftKey, {
@@ -899,13 +980,14 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       });
     }
   }, [
-    allBranchRefs,
-    availableBranches,
+    baseBranchesQuery.data,
+    preferencesLoaded,
+    rememberedBranchPending,
+    rememberedRef,
+    configuredBaseRef,
     defaultWorkspaceModeSettled,
     draftStartFromOrigin,
-    projectSettings.settings.defaultWorktreeBaseRef,
     selectedBranchName,
-    selectedEnvironmentServerConfig,
     selectedProjectDraftKey,
     workspaceMode,
   ]);
@@ -1167,6 +1249,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       selectedModelKey,
       workspaceMode,
       selectedBranchName,
+      lastWorktreeBaseBranch,
       selectedWorktreePath,
       startFromOrigin,
       draftKey: selectedProjectDraftKey,
@@ -1247,6 +1330,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       reset,
       runtimeMode,
       selectedBranchName,
+      lastWorktreeBaseBranch,
       hasMoreBranches,
       selectedEnvironmentId,
       selectedModel,

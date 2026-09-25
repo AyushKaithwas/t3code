@@ -37,6 +37,22 @@ describe("worktree base ref settings", () => {
     },
   );
 
+  it("round-trips last-used without reserving a valid branch name", () => {
+    const patch = decodeServerSettingsPatch({
+      defaultWorktreeBaseRef: { mode: "last-used" },
+      projectSettingsOverrides: { project: { defaultWorktreeBaseRef: { mode: "last-used" } } },
+    });
+    const encoded = encodeServerSettings(decodeServerSettings(patch));
+    expect(encoded.defaultWorktreeBaseRef).toEqual({ mode: "last-used" });
+    expect(encoded.projectSettingsOverrides).toEqual(patch.projectSettingsOverrides);
+    expect(
+      decodeServerSettingsPatch({ defaultWorktreeBaseRef: "last-used" }).defaultWorktreeBaseRef,
+    ).toBe("last-used");
+    expect(() =>
+      decodeServerSettingsPatch({ defaultWorktreeBaseRef: { mode: "unknown" } }),
+    ).toThrow();
+  });
+
   it("allows explicit repository defaults but rejects blank refs", () => {
     expect(
       decodeServerSettingsPatch({

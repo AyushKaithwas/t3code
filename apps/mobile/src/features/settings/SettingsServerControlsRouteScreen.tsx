@@ -9,6 +9,7 @@ import {
   type ServerSettingsPatch,
   type ThreadEnvMode,
   type WorktreeSubmodules,
+  type WorktreeBaseRef,
   PROJECT_SCOPED_SERVER_SETTING_KEYS,
   type ProjectScopedServerSettingKey,
 } from "@t3tools/contracts";
@@ -281,10 +282,32 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     ))}
                   </SettingsSection>
                   <SettingsSection title="Worktree base ref">
+                    <ChoiceRow
+                      label="Repository default"
+                      description="Start from the repository's default branch."
+                      selected={
+                        !isMixed("defaultWorktreeBaseRef") &&
+                        uniform("defaultWorktreeBaseRef") === null
+                      }
+                      separated={false}
+                      disabled={disabledFor("defaultWorktreeBaseRef")}
+                      onPress={() => write({ defaultWorktreeBaseRef: null })}
+                    />
+                    <ChoiceRow
+                      label="Last used"
+                      description="Reuse your last base in this project on this device."
+                      selected={
+                        !isMixed("defaultWorktreeBaseRef") &&
+                        uniform("defaultWorktreeBaseRef") !== null &&
+                        typeof uniform("defaultWorktreeBaseRef") === "object"
+                      }
+                      separated
+                      disabled={disabledFor("defaultWorktreeBaseRef")}
+                      onPress={() => write({ defaultWorktreeBaseRef: { mode: "last-used" } })}
+                    />
                     <View className="gap-3 p-4">
                       <Text className="text-sm text-foreground-muted">
-                        Branch, tag, or commit to start new worktrees from. Leave blank to use the
-                        repository default.
+                        Or enter a specific branch, tag, or commit.
                       </Text>
                       <WorktreeBaseRefField
                         key={JSON.stringify(
@@ -589,7 +612,7 @@ function FanoutSwitchRow(props: {
 }
 
 function WorktreeBaseRefField(props: {
-  readonly value: string | null;
+  readonly value: WorktreeBaseRef;
   readonly mixed: boolean;
   readonly disabled: boolean;
   readonly onCommit: (value: string | null) => void;
@@ -599,8 +622,8 @@ function WorktreeBaseRefField(props: {
     <AppTextInput
       accessibilityLabel="Worktree base ref"
       className="min-h-11 rounded-xl border-continuous bg-card px-3 text-base text-foreground"
-      value={draft ?? props.value ?? ""}
-      placeholder={props.mixed ? "Mixed" : "Repository default"}
+      value={draft ?? (typeof props.value === "string" ? props.value : "")}
+      placeholder={props.mixed ? "Mixed" : "Enter a specific ref…"}
       autoCapitalize="none"
       autoCorrect={false}
       returnKeyType="done"

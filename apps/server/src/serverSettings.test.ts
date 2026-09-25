@@ -320,6 +320,14 @@ it.layer(NodeServices.layer)("server settings", (it) => {
           yield* fileSystem.readFileString(serverConfig.settingsPath),
         );
         assert.deepEqual(persisted.projectSettingsOverrides, overrides);
+        const lastUsed = {
+          [projectId]: { defaultWorktreeBaseRef: { mode: "last-used" as const } },
+        };
+        yield* serverSettings.updateSettings({ projectSettingsOverrides: lastUsed });
+        const remembered = yield* decodeSettingsJson(
+          yield* fileSystem.readFileString(serverConfig.settingsPath),
+        );
+        assert.deepEqual(remembered.projectSettingsOverrides, lastUsed);
         const reset = yield* serverSettings.updateSettings({
           projectSettingsOverrides: { [projectId]: null },
         });

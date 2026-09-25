@@ -998,6 +998,12 @@ export const WorktreeCleanup = Schema.NullOr(
 );
 export type WorktreeCleanup = typeof WorktreeCleanup.Type;
 
+/** A fixed ref, repository default (null), or the last explicit base on this device. */
+export const WorktreeBaseRef = Schema.NullOr(
+  Schema.Union([TrimmedNonEmptyString, Schema.Struct({ mode: Schema.Literal("last-used") })]),
+);
+export type WorktreeBaseRef = typeof WorktreeBaseRef.Type;
+
 export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "worktreeCleanup",
   "defaultModelSelection",
@@ -1031,7 +1037,7 @@ export const ProjectSettingsOverrides = Schema.Struct({
   defaultModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   defaultRuntimeMode: Schema.optionalKey(RuntimeMode),
   defaultThreadEnvMode: Schema.optionalKey(ThreadEnvMode),
-  defaultWorktreeBaseRef: Schema.optionalKey(Schema.NullOr(TrimmedNonEmptyString)),
+  defaultWorktreeBaseRef: Schema.optionalKey(WorktreeBaseRef),
   newWorktreesStartFromOrigin: Schema.optionalKey(Schema.Boolean),
   worktreeSubmodules: ForwardCompatibleOptional(WorktreeSubmodules),
   defaultAutoPull: Schema.optionalKey(Schema.Boolean),
@@ -1212,9 +1218,7 @@ export const ServerSettings = Schema.Struct({
    */
   defaultThreadEnvMode: OmittedWhenNull(ThreadEnvMode),
   /** Null uses the repository default branch, then the current checkout. */
-  defaultWorktreeBaseRef: Schema.NullOr(TrimmedNonEmptyString).pipe(
-    Schema.withDecodingDefault(Effect.succeed(null)),
-  ),
+  defaultWorktreeBaseRef: WorktreeBaseRef.pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   newWorktreesStartFromOrigin: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(true)),
   ),
@@ -1516,7 +1520,7 @@ export const ServerSettingsPatch = Schema.Struct({
   backgroundActivityProfile: Schema.optionalKey(BackgroundActivityProfile),
   environmentIcon: Schema.optionalKey(Schema.NullOr(EnvironmentMachineKind)),
   defaultThreadEnvMode: Schema.optionalKey(Schema.NullOr(ThreadEnvMode)),
-  defaultWorktreeBaseRef: Schema.optionalKey(Schema.NullOr(TrimmedNonEmptyString)),
+  defaultWorktreeBaseRef: Schema.optionalKey(WorktreeBaseRef),
   newWorktreesStartFromOrigin: Schema.optionalKey(Schema.Boolean),
   worktreeSubmodules: Schema.optionalKey(Schema.NullOr(WorktreeSubmodules)),
   addProjectBaseDirectory: Schema.optionalKey(TrimmedString),

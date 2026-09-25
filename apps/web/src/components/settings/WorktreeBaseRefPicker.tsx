@@ -1,3 +1,4 @@
+import type { WorktreeBaseRef } from "@t3tools/contracts";
 import { useDeferredValue, useState } from "react";
 
 import { usePaginatedBranches } from "../../state/queries";
@@ -14,14 +15,17 @@ import {
 import { SelectButton } from "../ui/select";
 import { useSettingsScope } from "./SettingsScopeContext";
 
+// Git refs cannot contain NUL, so this picker value cannot collide with a branch name.
+const LAST_USED_OPTION = "\0last-used";
+
 export function WorktreeBaseRefPicker({
   value,
   mixed,
   onChange,
 }: {
-  value: string | null;
+  value: WorktreeBaseRef;
   mixed: boolean;
-  onChange: (value: string | null) => void;
+  onChange: (value: WorktreeBaseRef) => void;
 }) {
   const { scope, target } = useSettingsScope();
   const [open, setOpen] = useState(false);
@@ -38,12 +42,13 @@ export function WorktreeBaseRefPicker({
     query: deferredQuery,
   });
   const refNames = branches.refs.map((ref) => ref.name);
-  const matchingRefs = [...new Set([...(value ? [value] : []), ...refNames])].filter((ref) =>
-    ref.toLowerCase().includes(trimmedQuery.toLowerCase()),
-  );
+  const matchingRefs = [
+    ...new Set([...(typeof value === "string" ? [value] : []), ...refNames]),
+  ].filter((ref) => ref.toLowerCase().includes(trimmedQuery.toLowerCase()));
   const customRef = trimmedQuery !== "" && !matchingRefs.includes(trimmedQuery);
   const items = [
     ...("repository default".includes(trimmedQuery.toLowerCase()) ? [""] : []),
+    ...("last used".includes(trimmedQuery.toLowerCase()) ? [LAST_USED_OPTION] : []),
     ...(customRef ? [trimmedQuery] : []),
     ...matchingRefs,
   ];
@@ -53,18 +58,29 @@ export function WorktreeBaseRefPicker({
       items={items}
       filteredItems={items}
       autoHighlight
-      value={mixed ? null : (value ?? "")}
+      value={
+        mixed
+          ? null
+          : typeof value === "object" && value !== null
+            ? LAST_USED_OPTION
+            : (value ?? "")
+      }
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
         setQuery("");
       }}
       onValueChange={(next) => {
-        if (next !== null) onChange(next || null);
+        if (next !== null)
+          onChange(next === LAST_USED_OPTION ? { mode: "last-used" } : next || null);
       }}
     >
       <ComboboxTrigger aria-label="Worktree base ref" render={<SelectButton size="sm" />}>
-        {mixed ? "Mixed" : (value ?? "Repository default")}
+        {mixed
+          ? "Mixed"
+          : typeof value === "object" && value !== null
+            ? "Last used"
+            : (value ?? "Repository default")}
       </ComboboxTrigger>
       <ComboboxPopup align="end" className="flex w-72 flex-col">
         <ComboboxSearchInput
@@ -79,9 +95,11 @@ export function WorktreeBaseRefPicker({
               <span className="truncate">
                 {ref === ""
                   ? "Repository default"
-                  : customRef && ref === trimmedQuery
-                    ? `Use “${ref}”`
-                    : ref}
+                  : ref === LAST_USED_OPTION
+                    ? "Last used"
+                    : customRef && ref === trimmedQuery
+                      ? `Use “${ref}”`
+                      : ref}
               </span>
             </ComboboxItem>
           ))}
@@ -103,7 +121,9 @@ export function WorktreeBaseRefPicker({
               ? "Loading refs…"
               : !member
                 ? "Select a project for suggestions, or enter a branch, tag, or commit."
-                : "Choose a ref, or enter a branch, tag, or commit."}
+                : value !== null && typeof value === "object"
+                  ? "Reuses your last base in this project on this device."
+                  : "Choose a ref, or enter a branch, tag, or commit."}
         </ComboboxStatus>
       </ComboboxPopup>
     </Combobox>

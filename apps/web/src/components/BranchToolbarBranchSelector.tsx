@@ -38,6 +38,7 @@ import { usePaginatedBranches } from "../state/queries";
 import { useProject, useThreadShell } from "../state/entities";
 import { useEnvironmentQuery } from "../state/query";
 import { serverEnvironment } from "../state/server";
+import { useLastWorktreeBaseBranch } from "../worktreePreferences";
 import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import { vcsEnvironment } from "../state/vcs";
@@ -154,6 +155,8 @@ export function BranchToolbarBranchSelector({
       ? scopeProjectRef(draftThread.environmentId, draftThread.projectId)
       : null;
   const activeProject = useProject(activeProjectRef);
+  const [lastWorktreeBaseBranch, rememberWorktreeBaseBranch] =
+    useLastWorktreeBaseBranch(activeProjectRef);
   const serverSettings = useAtomValue(serverEnvironment.settingsValueAtom(environmentId));
   const configuredBaseRef = serverSettings
     ? resolveProjectSettings(
@@ -428,6 +431,7 @@ export function BranchToolbarBranchSelector({
 
     if (isSelectingWorktreeBase) {
       setThreadBranch(refName.name, null);
+      if (activeProjectRef) rememberWorktreeBaseBranch(refName.name);
       setIsBranchMenuOpen(false);
       onComposerFocusRequest?.();
       return;
@@ -520,13 +524,58 @@ export function BranchToolbarBranchSelector({
     });
   };
 
-  const worktreeBaseBranchCandidate = isInitialBranchesLoadPending
-    ? null
-    : resolveDefaultWorktreeBaseRef({
-        configuredRef: configuredBaseRef,
-        refs,
-        currentBranch: currentGitBranch,
-      });
+  const needsWorktreeBase =
+    effectiveEnvMode === "worktree" && !activeWorktreePath && !activeThreadBranch;
+  const rememberedBranch =
+    configuredBaseRef && typeof configuredBaseRef === "object" ? lastWorktreeBaseBranch : null;
+  // Base defaults must not depend on a search currently open in the branch picker.
+  const baseBranchesQuery = useEnvironmentQuery(
+    needsWorktreeBase && activeProjectCwd
+      ? vcsEnvironment.listRefs({ environmentId, input: { cwd: activeProjectCwd, limit: 100 } })
+      : null,
+  );
+  const rememberedBranchState = usePaginatedBranches({
+    environmentId,
+    cwd: needsWorktreeBase && rememberedBranch ? activeProjectCwd : null,
+    query: rememberedBranch?.slice(0, 256) ?? null,
+    includeMatchingRemoteRefs: true,
+  });
+  const rememberedRef = rememberedBranchState.refs.find((ref) => ref.name === rememberedBranch);
+  const hasMoreRememberedRefs = rememberedBranchState.data?.nextCursor != null;
+  const loadMoreRememberedRefs = rememberedBranchState.loadNext;
+  useEffect(() => {
+    if (
+      needsWorktreeBase &&
+      rememberedBranch &&
+      !rememberedRef &&
+      hasMoreRememberedRefs &&
+      !rememberedBranchState.isPending &&
+      !rememberedBranchState.error
+    )
+      loadMoreRememberedRefs();
+  }, [
+    needsWorktreeBase,
+    rememberedBranch,
+    rememberedRef,
+    hasMoreRememberedRefs,
+    rememberedBranchState.isPending,
+    rememberedBranchState.error,
+    loadMoreRememberedRefs,
+  ]);
+  const rememberedBranchPending =
+    rememberedBranch !== null &&
+    !rememberedRef &&
+    !rememberedBranchState.error &&
+    (rememberedBranchState.data === null || hasMoreRememberedRefs);
+  const worktreeBaseBranchCandidate =
+    baseBranchesQuery.data === null
+      ? null
+      : resolveDefaultWorktreeBaseRef({
+          configuredRef: configuredBaseRef,
+          rememberedRef: rememberedBranchPending ? undefined : (rememberedRef?.name ?? null),
+          refs: baseBranchesQuery.data.refs,
+          currentBranch: currentGitBranch,
+        });
 
   useEffect(() => {
     if (
@@ -766,6 +815,9 @@ export function BranchToolbarBranchSelector({
       >
         <div className="flex w-full min-w-0 items-center justify-between gap-2">
           <MiddleTruncate value={itemValue} className="flex-1" />
+          {isSelectingWorktreeBase && itemValue === lastWorktreeBaseBranch && (
+            <span className="shrink-0 text-3xs text-muted-foreground">Last used</span>
+          )}
           {badge && <span className="shrink-0 text-3xs text-muted-foreground/45">{badge}</span>}
         </div>
       </ComboboxItem>

@@ -279,6 +279,23 @@ describe("applyGitStatusStreamEvent", () => {
 describe("resolveDefaultWorktreeBaseRef", () => {
   const refs = [{ name: "origin/main", isDefault: true }];
 
+  it("waits for remembered refs and falls back only once their lookup settles", () => {
+    const input = { configuredRef: { mode: "last-used" as const }, refs, currentBranch: "main" };
+    expect(resolveDefaultWorktreeBaseRef(input)).toBeNull();
+    expect(resolveDefaultWorktreeBaseRef({ ...input, rememberedRef: "dev" })).toBe("dev");
+    expect(resolveDefaultWorktreeBaseRef({ ...input, rememberedRef: "origin/dev" })).toBe(
+      "origin/dev",
+    );
+    expect(resolveDefaultWorktreeBaseRef({ ...input, rememberedRef: null })).toBe("origin/main");
+    expect(resolveDefaultWorktreeBaseRef({ ...input, rememberedRef: null, refs: [] })).toBe("main");
+    expect(
+      resolveDefaultWorktreeBaseRef({ ...input, configuredRef: "release", rememberedRef: "dev" }),
+    ).toBe("release");
+    expect(
+      resolveDefaultWorktreeBaseRef({ ...input, configuredRef: null, rememberedRef: "dev" }),
+    ).toBe("origin/main");
+  });
+
   it("waits for saved settings when refs load first", () => {
     expect(
       resolveDefaultWorktreeBaseRef({

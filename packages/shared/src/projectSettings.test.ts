@@ -31,6 +31,15 @@ describe("resolveProjectSettings", () => {
     expect(resolveProjectSettings(settings, otherProjectId).settings.defaultWorktreeBaseRef).toBe(
       "main",
     );
+    const remembered = applyServerSettingsPatch(settings, {
+      projectSettingsOverrides: { [projectId]: { defaultWorktreeBaseRef: { mode: "last-used" } } },
+    });
+    expect(resolveProjectSettings(remembered, projectId).settings.defaultWorktreeBaseRef).toEqual({
+      mode: "last-used",
+    });
+    expect(resolveProjectSettings(remembered, otherProjectId).settings.defaultWorktreeBaseRef).toBe(
+      "main",
+    );
     const automatic = applyServerSettingsPatch(settings, {
       projectSettingsOverrides: { [projectId]: { defaultWorktreeBaseRef: null } },
     });
