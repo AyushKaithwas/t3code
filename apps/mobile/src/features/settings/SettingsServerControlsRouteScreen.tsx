@@ -31,6 +31,7 @@ import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 import { SettingsProjectOverridesSection } from "./components/SettingsProjectOverridesSection";
 import { useSettingsEnvironmentFilter } from "./settings-environment-filter";
 import {
+  mobileSettingsAreMixed,
   planMobileScopedSettingsClear,
   planMobileScopedSettingsPatch,
   resolveMobileSettingsTargets,
@@ -157,15 +158,12 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
   const displayTargets = pendingWrites > 0 && pendingTargets !== null ? pendingTargets : targets;
   const hasConnectedSelection = targets.length > 0;
   const reference = displayTargets[0] ?? null;
+  // `uniform` folds a real null into "mixed"; nullable keys need the distinction.
+  const isMixed = (key: keyof ServerSettings) => mobileSettingsAreMixed(displayTargets, key);
   const uniform = <K extends keyof ServerSettings>(key: K): ServerSettings[K] | null => {
     if (reference === null) return null;
-    const value = reference.settings[key];
-    return displayTargets.every((entry) => entry.settings[key] === value) ? value : null;
+    return isMixed(key) ? null : reference.settings[key];
   };
-  // `uniform` folds a real null into "mixed"; nullable keys need the distinction.
-  const isMixed = (key: keyof ServerSettings) =>
-    reference === null ||
-    displayTargets.some((entry) => entry.settings[key] !== reference.settings[key]);
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
     label: "environment settings update",
     reportFailure: true,
