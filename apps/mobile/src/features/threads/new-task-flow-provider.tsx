@@ -695,7 +695,6 @@ export function NewTaskFlowProvider(
             : workspaceMode === "local"
               ? resolveWorktreeSwitchBranch({
                   selectedBranch: selectedBranchName,
-                  checkoutBranch: localSelection.branch,
                   worktreeBaseBranch: projectSettings.settings.newWorktreesBaseBranch,
                 })
               : selectedBranchName,
